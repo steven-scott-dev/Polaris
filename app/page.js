@@ -1,35 +1,86 @@
-import { GoogleGenAI } from '@google/genai';
-import { NextResponse } from 'next/server';
+'use client';
+import { useState } from 'react';
 
-export async function POST(req) {
-  try {
-    const { prompt } = await req.json();
+export default function Home() {
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'API key is missing. Add GEMINI_API_KEY in Vercel settings.' },
-        { status: 500 }
-      );
-    }
+  const handleGenerate = async () => {
+    if (!prompt) return;
+    setLoading(true);
+    setResult(null);
+    setErrorMessage('');
 
-    const ai = new GoogleGenAI({ apiKey });
-
-    const systemInstruction = `You are an AI App Architect. Analyze the user's idea and generate a structured JSON breakdown.
-Return ONLY raw JSON with these keys: appName (string), tagline (string), features (array of strings), techStack (array of strings), starterCode (string).`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: `${systemInstruction}\n\nApp Idea: ${prompt}`,
-      config: {
-        responseMimeType: "application/json",
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to generate');
       }
-    });
+      
+      setResult(data);
+    } catch (err) {
+      setErrorMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const data = JSON.parse(response.text);
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('API Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
-  }
+  return (
+    <main style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '800px', margin: '0 auto', backgroundColor: '#0f172a', color: '#f8fafc', minHeight: '100vh' }}>
+      <h1>⚡ AI App Factory</h1>
+      <p>Type your app idea below to generate architectural specs and starter code.</p>
+
+      <div style={{ display: 'flex', gap: '10px', margin: '20px 0' }}>
+        <input
+          type="text"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="e.g., A fitness tracker that uses AI"
+          style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #334155', backgroundColor: '#1e293b', color: '#fff' }}
+        />
+        <button
+          onClick={handleGenerate}
+          disabled={loading}
+          style={{ padding: '12px 24px', borderRadius: '8px', border: 'none', backgroundColor: '#2563eb', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+        >
+          {loading ? 'Building...' : 'Generate App'}
+        </button>
+      </div>
+
+      {errorMessage && (
+        <div style={{ backgroundColor: '#7f1d1d', color: '#fca5a5', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
+          <strong>Error:</strong> {errorMessage}
+        </div>
+      )}
+
+      {result && (
+        <div style={{ backgroundColor: '#1e293b', padding: '20px', borderRadius: '12px', border: '1px solid #334155' }}>
+          <h2>🚀 {result.appName}</h2>
+          <p><em>{result.tagline}</em></p>
+
+          <h3>Features</h3>
+          <ul>
+            {result.features?.map((f, i) => <li key={i}>{f}</li>)}
+          </ul>
+
+          <h3>Tech Stack</h3>
+          <p>{result.techStack?.join(', ')}</p>
+
+          <h3>Generated Starter Code</h3>
+          <pre style={{ backgroundColor: '#020617', padding: '15px', borderRadius: '8px', overflowX: 'auto', color: '#38bdf8' }}>
+            <code>{result.starterCode}</code>
+          </pre>
+        </div>
+      )}
+    </main>
+  );
 }
