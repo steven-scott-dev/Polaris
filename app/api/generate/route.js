@@ -8,18 +8,22 @@ export async function POST(req) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'API key is missing. Add GEMINI_API_KEY in Vercel settings.' },
+        { error: 'API key missing. Add GEMINI_API_KEY in Vercel settings.' },
         { status: 500 }
       );
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    // Force SDK to use the Gemini Developer API Key instead of OAuth2/Vertex AI
+    const ai = new GoogleGenAI({ 
+      apiKey: apiKey,
+      vertexai: false 
+    });
 
     const systemInstruction = `You are an AI App Architect. Analyze the user's idea and generate a structured JSON breakdown.
 Return ONLY raw JSON with these keys: appName (string), tagline (string), features (array of strings), techStack (array of strings), starterCode (string).`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       contents: `${systemInstruction}\n\nApp Idea: ${prompt}`,
       config: {
         responseMimeType: "application/json",
